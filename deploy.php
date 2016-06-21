@@ -34,6 +34,14 @@ if (file_exists(basename(__FILE__, '.php').'-config.php')) {
 if (!defined('SECRET_ACCESS_TOKEN')) define('SECRET_ACCESS_TOKEN', 'BetterChangeMeNowOrSufferTheConsequences');
 
 /**
+ * Use the github mode of hashing the Secret Access token instead of passing it
+ * as a Query parameter
+ *
+ * @var bool
+ */
+if (!defined('SECRET_ACCESS_TOKEN_GITHUB_MODE')) define('SECRET_ACCESS_TOKEN_GITHUB_MODE', false);
+
+/**
  * The address of the remote Git repository that contains the code that's being
  * deployed.
  * If the repository is private, you'll need to use the SSH address.
@@ -162,9 +170,35 @@ if (!defined('COMPOSER_HOME')) define('COMPOSER_HOME', false);
 if (!defined('EMAIL_ON_ERROR')) define('EMAIL_ON_ERROR', false);
 
 // ===========================================[ Configuration end ]===
+$payload = @file_get_contents('php://input');
+
+function sat_ok($input)
+{
+	if (SECRET_ACCESS_TOKEN === 'BetterChangeMeNowOrSufferTheConsequences') {
+		return false;
+	}
+
+	if (!SECRET_ACCESS_TOKEN_GITHUB_MODE) {
+		return (!isset($_GET['sat']) || $_GET['sat'] !== SECRET_ACCESS_TOKEN);
+	}
+
+	/// GitHub mode, see https://developer.github.com/webhooks/securing/
+	$my_hash = hash_hmac('SHA1', SECRET_ACCESS_TOKEN, $input);
+	$gh_hash = $_SERVER['HTTP_X_HUB_SIGNATURE'];
+
+	$my_len = strlen($my_hash);
+	$gh_len = strlen($gh_hash);
+
+	// Secure-Compare both strings (constant-time, to avoid timing attacks)
+	$r = 0;
+	for ($i = 0; $i < $my_len && $i < $gh_len; $i++) {
+		$r |= ord($my_hash[$i]) ^ ord($gh_hash[$i]);
+	}
+	return $r === 0 && $my_len === $gh_len;
+}
 
 // If there's authorization error, set the correct HTTP header.
-if (!isset($_GET['sat']) || $_GET['sat'] !== SECRET_ACCESS_TOKEN || SECRET_ACCESS_TOKEN === 'BetterChangeMeNowOrSufferTheConsequences') {
+if (!sat_ok($payload)) {
 	header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden', true, 403);
 }
 ob_start();
@@ -185,14 +219,13 @@ h2, .error { color: #c33; }
 </head>
 <body>
 <?php
-if (!isset($_GET['sat']) || $_GET['sat'] !== SECRET_ACCESS_TOKEN) {
-	header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden', true, 403);
+if (SECRET_ACCESS_TOKEN === 'BetterChangeMeNowOrSufferTheConsequences') {
+	die("<h2>You're suffering the consequences!<br>Change the SECRET_ACCESS_TOKEN from its default value!</h2>");
+}
+if (!sat_ok($payload)) {
 	die('<h2>ACCESS DENIED!</h2>');
 }
-if (SECRET_ACCESS_TOKEN === 'BetterChangeMeNowOrSufferTheConsequences') {
-	header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden', true, 403);
-	die("<h2>You're suffering the consequences!<br>Change the SECRET_ACCESS_TOKEN from it's default value!</h2>");
-}
+
 ?>
 <pre>
 

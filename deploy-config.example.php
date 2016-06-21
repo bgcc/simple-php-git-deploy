@@ -22,6 +22,14 @@
 define('SECRET_ACCESS_TOKEN', 'BetterChangeMeNowOrSufferTheConsequences');
 
 /**
+ * Use the github mode of hashing the Secret Access token instead of passing it
+ * as a Query parameter. Set to true if deploying from github.
+ *
+ * @var bool
+ */
+define('SECRET_ACCESS_TOKEN_GITHUB_MODE', false);
+
+/**
  * The address of the remote Git repository that contains the code that's being
  * deployed.
  * If the repository is private, you'll need to use the SSH address.
